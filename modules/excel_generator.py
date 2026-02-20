@@ -234,7 +234,7 @@ def build_excel(form_data: dict, parsed: dict) -> bytes:
 
     task_headers = ['Issue Key', 'URL', 'Issue Type', 'Summary / Title',
                     'Status', 'Priority', 'Assignee',
-                    'Projected Start', 'Projected End']
+                    'Projected Start', 'Projected End', 'Comment']
     for col_idx, label in enumerate(task_headers, 1):
         c = ws.cell(15, col_idx)
         c.value = label
@@ -262,7 +262,7 @@ def build_excel(form_data: dict, parsed: dict) -> bytes:
 
         if item is None:
             ws.row_dimensions[current_row].height = 8
-            for col in range(1, 10):
+            for col in range(1, 11):
                 ws.cell(current_row, col).fill = PatternFill('solid', start_color='FFFFFF')
             current_row += 1
             continue
@@ -290,11 +290,12 @@ def build_excel(form_data: dict, parsed: dict) -> bytes:
             ik, url, item['issue_type'], summary_disp,
             item['status'], item['priority'], item['assignee'],
             item['target_start'], item['target_end'],
+            item.get('latest_comment', ''),
         ]
 
         for col_idx, val in enumerate(row_data, 1):
             cell = ws.cell(current_row, col_idx)
-            cell.alignment = Alignment(vertical='center', wrap_text=(col_idx == 4))
+            cell.alignment = Alignment(vertical='center', wrap_text=(col_idx in (4, 10)))
             cell.border    = border_epic if level == 0 else border_sub
 
             if col_idx == 2:
@@ -326,17 +327,16 @@ def build_excel(form_data: dict, parsed: dict) -> bytes:
         current_row += 1
 
     col_widths = {
-        'A': 14,
-        'B': 50,
-        'C': 14,
-        'D': 58,
-        'E': 16,
-        'F': 13,
-        'G': 24,
-        'H': 16,
-        'I': 16,
-        'J': 14,
-        'K': 24,
+        'A': 14,   # Issue Key
+        'B': 50,   # URL
+        'C': 14,   # Issue Type
+        'D': 58,   # Summary
+        'E': 16,   # Status
+        'F': 13,   # Priority
+        'G': 24,   # Assignee
+        'H': 16,   # Projected Start
+        'I': 16,   # Projected End
+        'J': 60,   # Comment
     }
     for col, w in col_widths.items():
         ws.column_dimensions[col].width = w

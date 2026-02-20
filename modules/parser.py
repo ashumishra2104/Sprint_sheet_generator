@@ -195,20 +195,45 @@ def parse_jira_csv(df: pd.DataFrame) -> dict:
     }
 
 
+def _extract_latest_comment(row) -> str:
+    """
+    Looks through Comment, Comment.1 ... Comment.6 columns,
+    finds the last non-empty one, and returns only the text after
+    the second semicolon (i.e. the actual comment text).
+    Format: "DD/Mon/YY HH:MM AM/PM ; AUTHOR_UUID ; COMMENT_TEXT"
+    """
+    comment_cols = ['Comment', 'Comment.1', 'Comment.2', 'Comment.3',
+                    'Comment.4', 'Comment.5', 'Comment.6']
+    latest = ''
+    for col in comment_cols:
+        val = row.get(col, '')
+        if pd.notna(val) and str(val).strip():
+            latest = str(val).strip()
+    if not latest:
+        return ''
+    # Split on semicolon — take everything after the 2nd semicolon
+    parts = latest.split(';', 2)
+    if len(parts) == 3:
+        return parts[2].strip()
+    # Fallback: return the whole value if format is unexpected
+    return latest
+
+
 def _make_row(row, level: int) -> dict:
     """Convert a DataFrame row into a clean dict for the hierarchy."""
     ts = row.get('Target Start')
     te = row.get('Target End')
     return {
-        'level':        level,
-        'issue_key':    row['Issue key'],
-        'issue_type':   row['Issue Type'],
-        'summary':      row['Summary'],
-        'status':       row['Status'],
-        'priority':     row['Priority'],
-        'assignee':     row['Assignee'],
-        'target_start': ts.strftime('%d %b %Y') if pd.notna(ts) else '-',
-        'target_end':   te.strftime('%d %b %Y') if pd.notna(te) else '-',
+        'level':          level,
+        'issue_key':      row['Issue key'],
+        'issue_type':     row['Issue Type'],
+        'summary':        row['Summary'],
+        'status':         row['Status'],
+        'priority':       row['Priority'],
+        'assignee':       row['Assignee'],
+        'target_start':   ts.strftime('%d %b %Y') if pd.notna(ts) else '-',
+        'target_end':     te.strftime('%d %b %Y') if pd.notna(te) else '-',
+        'latest_comment': _extract_latest_comment(row),
     }
 
 
