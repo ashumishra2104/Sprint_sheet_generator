@@ -46,7 +46,7 @@ C_ONHOLD      = 'A6A6A6'
 C_ANOTHER     = '7030A0'
 
 # Hierarchy row colours
-EPIC_BG   = '1F3864'
+EPIC_BG   = 'C39BD3'
 STORY_BG  = '2E75B6'
 SUB_BG    = 'D9E2F3'
 
@@ -238,16 +238,16 @@ def build_excel(form_data: dict, parsed: dict) -> bytes:
     for col_idx, label in enumerate(task_headers, 1):
         c = ws.cell(15, col_idx)
         c.value = label
-        _apply(c, _hdr('1F3864'))
+        _apply(c, _hdr('D1BBF0', fg='4A235A'))
     ws.row_dimensions[15].height = 28
 
     thin_w = Side(style='thin', color='B8CCE4')
     thin_g = Side(style='thin', color='CCCCCC')
     border_epic = Border(
-        left=Side(style='medium', color='1F3864'),
-        right=Side(style='medium', color='1F3864'),
-        top=Side(style='medium', color='1F3864'),
-        bottom=Side(style='medium', color='1F3864'),
+        left=Side(style='medium', color='C39BD3'),
+        right=Side(style='medium', color='C39BD3'),
+        top=Side(style='medium', color='C39BD3'),
+        bottom=Side(style='medium', color='C39BD3'),
     )
     border_sub = Border(left=thin_g, right=thin_g, top=thin_g, bottom=thin_g)
 
@@ -272,16 +272,16 @@ def build_excel(form_data: dict, parsed: dict) -> bytes:
         url     = f"{JIRA_BASE}/{ik}"
 
         if level == 0:
-            summary_disp = '⬛  ' + item['summary'].upper()
-            bg, fg, bold, sz = EPIC_BG, WHITE, True, 11
+            summary_disp = item['summary'].upper()
+            bg, fg, bold, sz = EPIC_BG, '4A235A', True, 10
             row_h = 28
         elif level == 1:
             summary_disp = '    ▶  ' + item['summary']
-            bg, fg, bold, sz = STORY_BG, WHITE, True, 10
+            bg, fg, bold, sz = WHITE, '1F3864', True, 10
             row_h = 22
         else:
             summary_disp = '         ◦  ' + item['summary']
-            bg, fg, bold, sz = SUB_BG, '1F3864', False, 9
+            bg, fg, bold, sz = WHITE, '1F3864', False, 10
             row_h = 18
 
         ws.row_dimensions[current_row].height = row_h
