@@ -5,10 +5,22 @@ Run with: streamlit run app.py
 
 import streamlit as st
 import pandas as pd
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from modules.parser          import parse_jira_csv
 from modules.excel_generator import build_excel
+
+PROJECTS = [
+    "PreScreening.io",
+    "Transact_Comply",
+    "Entity_Hero",
+    "DueDiliger",
+    "ZiZi",
+    "SATOC",
+    "WMP",
+    "Profile_Builder",
+]
 
 st.set_page_config(
     page_title="Sprint Report Generator",
@@ -75,6 +87,7 @@ if step == 1:
             prod_release = st.date_input("Production Release Date", value=date(2026, 2, 22))
             sprint_end   = st.date_input("Sprint End Date",          value=date(2026, 2, 22))
         with c4:
+            project_name = st.selectbox("Project", PROJECTS)
             scrum_master = st.text_input("Scrum Master", placeholder="e.g. Rishav Kumar")
 
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
@@ -115,6 +128,7 @@ if step == 1:
                     total_days=total_days,       days_left=days_left,
                     scrum_master=scrum_master.strip(), sprint_goal=sprint_goal.strip(),
                     major_item_1=major1.strip(), major_item_2=major2.strip(), major_item_3=major3.strip(),
+                    project_name=project_name,
                 )
                 st.session_state.step = 2
                 st.rerun()
@@ -193,7 +207,8 @@ elif step == 3:
 
     kpis        = st.session_state.parsed_kpis
     excel_bytes = st.session_state.excel_bytes
-    filename    = f"Sprint_{fd['sprint_number']}_Report.xlsx"
+    ist_date = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d.%m.%Y")
+    filename = f"{fd['project_name']}_{ist_date}.xlsx"
 
     st.markdown('<div class="download-box"><div class="download-title">✅ Excel Report Ready!</div><div class="download-sub">Your Sprint Report has been generated successfully.</div></div>', unsafe_allow_html=True)
 
