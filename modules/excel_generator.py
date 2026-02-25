@@ -232,16 +232,30 @@ def build_excel(form_data: dict, parsed: dict) -> bytes:
     ws['A14'].value = '🟡 Yellow = Manual Input   |   Auto-calculated fields derived from Jira CSV'
     ws['A14'].font  = Font(name='Arial', size=8, italic=True, color='595959')
 
-    task_headers = ['Issue Key', 'URL', 'Issue Type', 'Summary / Title',
-                    'Status', 'Priority', 'Assignee',
-                    'Projected Start', 'Projected End', 'Comment']
+    # Columns: S.No | Issue Key | Jira Link | Issue Type | Summary | Status |
+    #          Priority | Assignee | Start Date | End Date |
+    #          Revised Start Date | Revised End Date | Comment
+    task_headers = [
+        'S.No',
+        'Issue Key',
+        'Jira Link / Confluence Document Link',
+        'Issue Type',
+        'Summary / Title',
+        'Status',
+        'Priority',
+        'Assignee',
+        'Start Date',
+        'End Date',
+        'Revised Start Date',
+        'Revised End Date',
+        'Comment',
+    ]
     for col_idx, label in enumerate(task_headers, 1):
         c = ws.cell(15, col_idx)
         c.value = label
         _apply(c, _hdr('D1BBF0', fg='4A235A'))
     ws.row_dimensions[15].height = 28
 
-    thin_w = Side(style='thin', color='B8CCE4')
     thin_g = Side(style='thin', color='CCCCCC')
     border_epic = Border(
         left=Side(style='medium', color='C39BD3'),
@@ -257,19 +271,55 @@ def build_excel(form_data: dict, parsed: dict) -> bytes:
         if i + 1 < len(hierarchy) and hierarchy[i+1]['level'] == 0:
             rows_with_spacers.append(None)
 
+    # ── Pre-compute S.No for every item ──────────────────────────────────────
+    epic_counter  = 0
+    story_counter = 0
+    sub_counters  = {}   # parent_story_idx -> sub count
+
+    last_epic_num  = 0
+    last_story_num = 0
+    last_story_key = None   # track which story we're under for sub numbering
+
+    for item in rows_with_spacers:
+        if item is None:
+            item_sno = ''
+        elif item['level'] == 0:
+            epic_counter  += 1
+            story_counter  = 0
+            last_story_key = None
+            item_sno       = str(epic_counter)
+            last_epic_num  = epic_counter
+        elif item['level'] == 1:
+            story_counter += 1
+            last_story_key = item['issue_key']
+            sub_counters[last_story_key] = 0
+            item_sno = f"{last_epic_num}.{story_counter}"
+            last_story_num = story_counter
+        else:  # level == 2  (sub-task)
+            if last_story_key and last_story_key in sub_counters:
+                sub_counters[last_story_key] += 1
+                sub_num = sub_counters[last_story_key]
+            else:
+                sub_num = 1
+            item_sno = f"{last_epic_num}.{last_story_num}.{sub_num}"
+
+        if item is not None:
+            item['sno'] = item_sno
+
+    # ── Write rows ────────────────────────────────────────────────────────────
     current_row = 16
     for item in rows_with_spacers:
 
         if item is None:
             ws.row_dimensions[current_row].height = 8
-            for col in range(1, 11):
+            for col in range(1, 14):
                 ws.cell(current_row, col).fill = PatternFill('solid', start_color='FFFFFF')
             current_row += 1
             continue
 
-        level   = item['level']
-        ik      = item['issue_key']
-        url     = f"{JIRA_BASE}/{ik}"
+        level = item['level']
+        ik    = item['issue_key']
+        url   = f"{JIRA_BASE}/{ik}"
 
         if level == 0:
             summary_disp = item['summary'].upper()
@@ -286,26 +336,42 @@ def build_excel(form_data: dict, parsed: dict) -> bytes:
 
         ws.row_dimensions[current_row].height = row_h
 
+        # col index:  1        2    3    4               5             6
         row_data = [
-            ik, url, item['issue_type'], summary_disp,
-            item['status'], item['priority'], item['assignee'],
-            item['target_start'], item['target_end'],
+            item.get('sno', ''),
+            ik,
+            url,
+            item['issue_type'],
+            summary_disp,
+            item['status'],
+            item['priority'],
+            item['assignee'],
+            item['target_start'],
+            item['target_end'],
+            '',   # Revised Start Date (empty)
+            '',   # Revised End Date   (empty)
             item.get('latest_comment', ''),
         ]
 
+        # Summary=col5, Comment=col13, wrap text on both
+        WRAP_COLS   = {5, 13}
+        # URL is col 3, Status is col 6
+        URL_COL     = 3
+        STATUS_COL  = 6
+
         for col_idx, val in enumerate(row_data, 1):
             cell = ws.cell(current_row, col_idx)
-            cell.alignment = Alignment(vertical='center', wrap_text=(col_idx in (4, 10)))
+            cell.alignment = Alignment(vertical='center', wrap_text=(col_idx in WRAP_COLS))
             cell.border    = border_epic if level == 0 else border_sub
 
-            if col_idx == 2:
+            if col_idx == URL_COL:
                 cell.value     = val
                 cell.hyperlink = val
                 cell.font      = Font(bold=False, color='4472C4', name='Arial',
                                       size=sz, underline='single')
                 cell.fill      = PatternFill('solid', start_color=bg)
 
-            elif col_idx == 5:
+            elif col_idx == STATUS_COL:
                 sv = str(item['status'])
                 if any(s in sv for s in ['Done', 'DONE', 'Production', 'Released']):
                     sc = STATUS_DONE
@@ -327,16 +393,19 @@ def build_excel(form_data: dict, parsed: dict) -> bytes:
         current_row += 1
 
     col_widths = {
-        'A': 14,   # Issue Key
-        'B': 50,   # URL
-        'C': 14,   # Issue Type
-        'D': 58,   # Summary
-        'E': 16,   # Status
-        'F': 13,   # Priority
-        'G': 24,   # Assignee
-        'H': 16,   # Projected Start
-        'I': 16,   # Projected End
-        'J': 60,   # Comment
+        'A':  8,   # S.No
+        'B': 14,   # Issue Key
+        'C': 50,   # Jira Link / Confluence Document Link
+        'D': 14,   # Issue Type
+        'E': 58,   # Summary / Title
+        'F': 16,   # Status
+        'G': 13,   # Priority
+        'H': 24,   # Assignee
+        'I': 16,   # Start Date
+        'J': 16,   # End Date
+        'K': 18,   # Revised Start Date
+        'L': 18,   # Revised End Date
+        'M': 60,   # Comment
     }
     for col, w in col_widths.items():
         ws.column_dimensions[col].width = w
